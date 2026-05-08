@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://127.0.0.1:5000/api');
 const STATUS_OPTIONS = ['Todo', 'In Progress', 'Done'];
 const PRIORITY_OPTIONS = ['Low', 'Medium', 'High'];
 const REVIEW_OPTIONS = ['Pending', 'Approved', 'Rejected'];
@@ -184,7 +184,7 @@ function AuthPage({ onAuth }) {
       const data = await request(path, body);
       onAuth(data);
     } catch (err) {
-      setError(err.message === 'Failed to fetch' ? 'API is not reachable. Start the backend on port 5000.' : err.message);
+      setError(err.message === 'Failed to fetch' ? 'API is not reachable. Check the backend deployment or API URL.' : err.message);
     } finally {
       setLoading(false);
     }
@@ -199,7 +199,7 @@ function AuthPage({ onAuth }) {
       setMessage(data.message);
       setResetLink(data.resetUrl || '');
     } catch (err) {
-      setError(err.message === 'Failed to fetch' ? 'API is not reachable. Start the backend on port 5000.' : err.message);
+      setError(err.message === 'Failed to fetch' ? 'API is not reachable. Check the backend deployment or API URL.' : err.message);
     } finally {
       setLoading(false);
     }
@@ -218,7 +218,7 @@ function AuthPage({ onAuth }) {
       });
       onAuth(data);
     } catch (err) {
-      setError(err.message === 'Failed to fetch' ? 'API is not reachable. Start the backend on port 5000.' : err.message);
+      setError(err.message === 'Failed to fetch' ? 'API is not reachable. Check the backend deployment or API URL.' : err.message);
     } finally {
       setLoading(false);
     }
@@ -357,7 +357,7 @@ function GoogleSignIn({ role, onAuth, onError }) {
             }
             onAuth(data);
           } catch (err) {
-            onError(err.message === 'Failed to fetch' ? 'API is not reachable. Start the backend on port 5000.' : err.message);
+            onError(err.message === 'Failed to fetch' ? 'API is not reachable. Check the backend deployment or API URL.' : err.message);
           }
         }
       });
