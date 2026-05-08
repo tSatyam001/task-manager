@@ -318,6 +318,7 @@ function AuthPage({ onAuth }) {
 function GoogleSignIn({ role, onAuth, onError }) {
   const buttonRef = useRef(null);
   const [serverClientId, setServerClientId] = useState('');
+  const [configMessage, setConfigMessage] = useState('');
   const [configLoaded, setConfigLoaded] = useState(Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID));
   const [googleMessage, setGoogleMessage] = useState('');
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || serverClientId;
@@ -329,9 +330,11 @@ function GoogleSignIn({ role, onAuth, onError }) {
       .then((res) => res.json())
       .then((data) => {
         setServerClientId(data.googleClientId || '');
+        setConfigMessage(data.googleOAuthMessage || '');
         setConfigLoaded(true);
       })
       .catch(() => {
+        setConfigMessage('Google sign-in config could not be loaded from the backend.');
         setConfigLoaded(true);
       });
   }, []);
@@ -394,7 +397,7 @@ function GoogleSignIn({ role, onAuth, onError }) {
   }
 
   if (!clientId) {
-    return <p className="auth-note">Add GOOGLE_CLIENT_ID in the backend env to enable Google sign-in.</p>;
+    return <p className="auth-note">{configMessage || 'Add GOOGLE_CLIENT_ID in the backend env to enable Google sign-in.'}</p>;
   }
 
   const chooseAnotherAccount = () => {

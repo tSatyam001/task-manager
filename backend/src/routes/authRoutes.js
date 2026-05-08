@@ -30,6 +30,17 @@ const hashOtp = (otp) => crypto.createHash('sha256').update(String(otp)).digest(
 
 const isValidRole = (role) => !role || ['Admin', 'Member'].includes(role);
 
+const googleClientId = () => (process.env.GOOGLE_CLIENT_ID || '').trim();
+
+const googleClientIdProblem = () => {
+  const clientId = googleClientId();
+
+  if (!clientId) return 'Google OAuth is not configured on the server';
+  if (!clientId.endsWith('.apps.googleusercontent.com')) return 'Google OAuth client ID must end with .apps.googleusercontent.com';
+  if (/your_|1234567890|x{4,}|example/i.test(clientId)) return 'Google OAuth client ID still looks like a placeholder. Create a Web application OAuth client in Google Cloud and paste its real Client ID.';
+  return '';
+};
+
 const issueAuth = (user) => ({
   token: createToken(user._id),
   user: userResponse(user)
@@ -43,9 +54,12 @@ const otpResponse = (mailResult, otp) => ({
 });
 
 router.get('/config', (req, res) => {
+  const configProblem = googleClientIdProblem();
+
   res.json({
-    googleClientId: process.env.GOOGLE_CLIENT_ID || '',
-    googleOAuthEnabled: Boolean(process.env.GOOGLE_CLIENT_ID)
+    googleClientId: configProblem ? '' : googleClientId(),
+    googleOAuthEnabled: !configProblem,
+    googleOAuthMessage: configProblem
   });
 });
 
@@ -229,8 +243,10 @@ router.post('/google', async (req, res) => {
     return res.status(400).json({ message: 'Google credential is required' });
   }
 
-  if (!process.env.GOOGLE_CLIENT_ID) {
-    return res.status(500).json({ message: 'Google OAuth is not configured on the server' });
+  const configProblem = googleClientIdProblem();
+
+  if (configProblem) {
+    return res.status(500).json({ message: configProblem });
   }
 
   if (!isValidRole(role)) {
@@ -240,7 +256,7 @@ router.post('/google', async (req, res) => {
   const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
   const profile = await googleRes.json().catch(() => ({}));
 
-  if (!googleRes.ok || profile.aud !== process.env.GOOGLE_CLIENT_ID || !['true', true].includes(profile.email_verified)) {
+  if (!googleRes.ok || profile.aud !== googleClientId() || !['true', true].includes(profile.email_verified)) {
     return res.status(401).json({ message: 'Invalid Google sign-in token' });
   }
 
