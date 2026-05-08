@@ -306,7 +306,7 @@ function AuthPage({ onAuth }) {
 
         <div className="auth-links">
           {mode !== 'login' && <button className="link-button" onClick={() => switchMode('login')}>Back to login</button>}
-          {mode !== 'signup' && <button className="link-button" onClick={() => switchMode('signup')}>Need an account?</button>}
+          {mode !== 'signup' && <button className="link-button" onClick={() => switchMode('signup')}>Create account</button>}
           {mode !== 'otp' && <button className="link-button" onClick={() => switchMode('otp')}>Use OTP instead</button>}
           {mode !== 'forgot' && <button className="link-button" onClick={() => switchMode('forgot')}>Forgot password?</button>}
         </div>
