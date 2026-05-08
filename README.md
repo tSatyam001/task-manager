@@ -4,7 +4,7 @@ A full-stack task management app for teams. Users can sign up, log in, create pr
 
 ## Features
 
-- Signup, password login, OTP login, Google sign-in, and forgot-password reset
+- Signup, password login, Google sign-in, and email-link password reset
 - Admin and Member roles
 - Project creation and team member selection
 - Task creation, assignment, priority, due date, and status updates
@@ -19,7 +19,7 @@ A full-stack task management app for teams. Users can sign up, log in, create pr
 - Express.js
 - MongoDB with Mongoose
 - JWT authentication
-- Email OTP delivery with SMTP
+- Password reset email delivery with SMTP
 
 ## Setup
 
@@ -38,15 +38,16 @@ MONGO_URI=your_mongodb_connection_string
 JWT_SECRET=your_secret_key
 CLIENT_URL=http://127.0.0.1:5173
 GOOGLE_CLIENT_ID=your_google_oauth_client_id
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=your_smtp_username
-SMTP_PASS=your_smtp_password
-SMTP_FROM="Task Manager <no-reply@example.com>"
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=your_gmail_address@gmail.com
+SMTP_PASS=your_gmail_app_password
+SMTP_FROM="Task Manager <your_gmail_address@gmail.com>"
 ```
 
-SMTP is required for OTP login and forgot-password reset. OTPs are never returned to the browser.
+SMTP is required for password reset emails. Reset links are sent to the configured `CLIENT_URL` and expire after 1 hour.
+For Gmail, enable 2-Step Verification and create an App Password from Google Account > Security > App passwords.
 
 Optional frontend `.env`. If omitted, the frontend reads `GOOGLE_CLIENT_ID` from the backend auth config endpoint.
 

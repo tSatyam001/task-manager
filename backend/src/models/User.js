@@ -33,10 +33,8 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
-    loginOtpHash: String,
-    loginOtpExpires: Date,
-    resetOtpHash: String,
-    resetOtpExpires: Date,
+    resetTokenHash: String,
+    resetTokenExpires: Date,
     role: {
       type: String,
       enum: ['Admin', 'Member'],

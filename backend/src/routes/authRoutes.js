@@ -4,11 +4,11 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const protect = require('../middleware/auth');
-const { hasSmtpConfig, sendOtpEmail } = require('../utils/mailer');
+const { hasSmtpConfig, sendPasswordResetEmail, smtpConfigProblem } = require('../utils/mailer');
 const { isEmail, missingFields } = require('../utils/validators');
 
 const router = express.Router();
-const OTP_TTL_MS = 10 * 60 * 1000;
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
 const createToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'dev_secret', { expiresIn: '7d' });
@@ -24,9 +24,9 @@ const userResponse = (user) => ({
 
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
 
-const createOtp = () => String(crypto.randomInt(100000, 1000000));
+const createResetToken = () => crypto.randomBytes(32).toString('hex');
 
-const hashOtp = (otp) => crypto.createHash('sha256').update(String(otp)).digest('hex');
+const hashToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 
 const isValidRole = (role) => !role || ['Admin', 'Member'].includes(role);
 
@@ -46,24 +46,30 @@ const issueAuth = (user) => ({
   user: userResponse(user)
 });
 
-const otpResponse = () => ({
-  message: 'OTP sent to your email'
+const passwordResetResponse = () => ({
+  message: 'Password reset link sent to your email'
 });
 
-const clearLoginOtp = (user) => {
-  user.loginOtpHash = undefined;
-  user.loginOtpExpires = undefined;
-};
-
-const clearResetOtp = (user) => {
-  user.resetOtpHash = undefined;
-  user.resetOtpExpires = undefined;
+const clearResetToken = (user) => {
+  user.resetTokenHash = undefined;
+  user.resetTokenExpires = undefined;
 };
 
 const emailNotConfiguredResponse = (res) => {
   return res.status(503).json({
-    message: 'Email service is not configured. Add SMTP settings to send OTP emails.'
+    message: smtpConfigProblem() || 'Email service is not configured. Add SMTP settings to send password reset emails.'
   });
+};
+
+const clientUrl = () => (process.env.CLIENT_URL || 'http://127.0.0.1:5173').replace(/\/$/, '');
+
+const allowDevResetLinks = () => process.env.PASSWORD_RESET_DEV_LINKS === 'true';
+
+const passwordResetUrl = ({ email, token }) => {
+  const url = new URL(clientUrl());
+  url.searchParams.set('resetToken', token);
+  url.searchParams.set('email', email);
+  return url.toString();
 };
 
 router.get('/config', (req, res) => {
@@ -133,77 +139,6 @@ router.post('/login', async (req, res) => {
   res.json(issueAuth(user));
 });
 
-router.post('/otp/request', async (req, res) => {
-  const email = normalizeEmail(req.body.email);
-
-  if (!email) {
-    return res.status(400).json({ message: 'Email is required' });
-  }
-
-  if (!isEmail(email)) {
-    return res.status(400).json({ message: 'Enter a valid email address' });
-  }
-
-  const user = await User.findOne({ email });
-  if (!user) {
-    return res.status(404).json({ message: 'No account found for this email' });
-  }
-
-  if (!hasSmtpConfig()) {
-    return emailNotConfiguredResponse(res);
-  }
-
-  const otp = createOtp();
-  user.loginOtpHash = hashOtp(otp);
-  user.loginOtpExpires = new Date(Date.now() + OTP_TTL_MS);
-  await user.save();
-
-  try {
-    const mailResult = await sendOtpEmail({
-      to: user.email,
-      otp,
-      subject: 'Your login OTP',
-      purpose: 'login'
-    });
-
-    if (!mailResult.delivered) {
-      clearLoginOtp(user);
-      await user.save();
-      return res.status(503).json({ message: mailResult.message || 'Unable to send OTP email' });
-    }
-  } catch (error) {
-    clearLoginOtp(user);
-    await user.save();
-    return res.status(502).json({ message: 'Unable to send OTP email. Check SMTP settings and try again.' });
-  }
-
-  res.json(otpResponse());
-});
-
-router.post('/otp/verify', async (req, res) => {
-  const email = normalizeEmail(req.body.email);
-  const { otp } = req.body;
-
-  if (!email || !otp) {
-    return res.status(400).json({ message: 'Email and OTP are required' });
-  }
-
-  const user = await User.findOne({ email });
-  const validOtp = user?.loginOtpHash === hashOtp(otp);
-  const validExpiry = user?.loginOtpExpires && user.loginOtpExpires > new Date();
-
-  if (!user || !validOtp || !validExpiry) {
-    return res.status(401).json({ message: 'Invalid or expired OTP' });
-  }
-
-  user.loginOtpHash = undefined;
-  user.loginOtpExpires = undefined;
-  user.emailVerified = true;
-  await user.save();
-
-  res.json(issueAuth(user));
-});
-
 router.post('/forgot-password/request', async (req, res) => {
   const email = normalizeEmail(req.body.email);
 
@@ -218,35 +153,43 @@ router.post('/forgot-password/request', async (req, res) => {
   const user = await User.findOne({ email });
 
   if (user) {
+    const resetToken = createResetToken();
+    const resetUrl = passwordResetUrl({ email: user.email, token: resetToken });
+    user.resetTokenHash = hashToken(resetToken);
+    user.resetTokenExpires = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+    await user.save();
+
     if (!hasSmtpConfig()) {
+      if (allowDevResetLinks()) {
+        return res.json({
+          message: 'Development reset link generated. Configure SMTP to send this by email.',
+          resetUrl
+        });
+      }
+
+      clearResetToken(user);
+      await user.save();
       return emailNotConfiguredResponse(res);
     }
 
-    const otp = createOtp();
-    user.resetOtpHash = hashOtp(otp);
-    user.resetOtpExpires = new Date(Date.now() + OTP_TTL_MS);
-    await user.save();
-
     try {
-      const mailResult = await sendOtpEmail({
+      const mailResult = await sendPasswordResetEmail({
         to: user.email,
-        otp,
-        subject: 'Reset your password',
-        purpose: 'password reset'
+        resetUrl
       });
 
       if (!mailResult.delivered) {
-        clearResetOtp(user);
+        clearResetToken(user);
         await user.save();
-        return res.status(503).json({ message: mailResult.message || 'Unable to send OTP email' });
+        return res.status(503).json({ message: mailResult.message || 'Unable to send password reset email' });
       }
     } catch (error) {
-      clearResetOtp(user);
+      clearResetToken(user);
       await user.save();
-      return res.status(502).json({ message: 'Unable to send OTP email. Check SMTP settings and try again.' });
+      return res.status(502).json({ message: 'Unable to send password reset email. Check SMTP settings and try again.' });
     }
 
-    return res.json(otpResponse());
+    return res.json(passwordResetResponse());
   }
 
   res.status(404).json({ message: 'No account found for this email' });
@@ -254,10 +197,10 @@ router.post('/forgot-password/request', async (req, res) => {
 
 router.post('/forgot-password/reset', async (req, res) => {
   const email = normalizeEmail(req.body.email);
-  const { otp, password } = req.body;
+  const { token, password } = req.body;
 
-  if (!email || !otp || !password) {
-    return res.status(400).json({ message: 'Email, OTP, and new password are required' });
+  if (!email || !token || !password) {
+    return res.status(400).json({ message: 'Email, reset token, and new password are required' });
   }
 
   if (password.length < 6) {
@@ -265,17 +208,16 @@ router.post('/forgot-password/reset', async (req, res) => {
   }
 
   const user = await User.findOne({ email });
-  const validOtp = user?.resetOtpHash === hashOtp(otp);
-  const validExpiry = user?.resetOtpExpires && user.resetOtpExpires > new Date();
+  const validToken = user?.resetTokenHash === hashToken(token);
+  const validExpiry = user?.resetTokenExpires && user.resetTokenExpires > new Date();
 
-  if (!user || !validOtp || !validExpiry) {
-    return res.status(401).json({ message: 'Invalid or expired reset OTP' });
+  if (!user || !validToken || !validExpiry) {
+    return res.status(401).json({ message: 'Invalid or expired reset link' });
   }
 
   user.password = await bcrypt.hash(password, 10);
   user.authProvider = user.authProvider || 'local';
-  user.resetOtpHash = undefined;
-  user.resetOtpExpires = undefined;
+  clearResetToken(user);
   await user.save();
 
   res.json(issueAuth(user));

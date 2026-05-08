@@ -141,6 +141,13 @@ button[type='submit'],
   margin: 6px 0;
 }
 
+.reset-link {
+  display: inline-flex;
+  width: fit-content;
+  color: #285f8f;
+  font-weight: 700;
+}
+
 .auth-stack {
   display: grid;
   gap: 12px;

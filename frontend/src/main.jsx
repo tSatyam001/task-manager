@@ -139,10 +139,20 @@ function App() {
 }
 
 function AuthPage({ onAuth }) {
-  const [mode, setMode] = useState('login');
-  const [form, setForm] = useState({ name: '', email: '', password: '', otp: '', role: 'Member' });
+  const resetParams = new URLSearchParams(window.location.search);
+  const initialResetToken = resetParams.get('resetToken') || '';
+  const initialResetEmail = resetParams.get('email') || '';
+  const [mode, setMode] = useState(initialResetToken ? 'reset' : 'login');
+  const [form, setForm] = useState({
+    name: '',
+    email: initialResetEmail,
+    password: '',
+    resetToken: initialResetToken,
+    role: 'Member'
+  });
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [resetLink, setResetLink] = useState('');
   const [loading, setLoading] = useState(false);
 
   const request = async (path, body) => {
@@ -160,6 +170,7 @@ function AuthPage({ onAuth }) {
   const resetFeedback = () => {
     setError('');
     setMessage('');
+    setResetLink('');
   };
 
   const submit = async (event) => {
@@ -179,28 +190,14 @@ function AuthPage({ onAuth }) {
     }
   };
 
-  const requestOtp = async () => {
+  const requestPasswordReset = async () => {
     resetFeedback();
     setLoading(true);
 
     try {
-      const path = mode === 'forgot' ? '/auth/forgot-password/request' : '/auth/otp/request';
-      const data = await request(path, { email: form.email });
+      const data = await request('/auth/forgot-password/request', { email: form.email });
       setMessage(data.message);
-    } catch (err) {
-      setError(err.message === 'Failed to fetch' ? 'API is not reachable. Start the backend on port 5000.' : err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const verifyOtp = async () => {
-    resetFeedback();
-    setLoading(true);
-
-    try {
-      const data = await request('/auth/otp/verify', { email: form.email, otp: form.otp });
-      onAuth(data);
+      setResetLink(data.resetUrl || '');
     } catch (err) {
       setError(err.message === 'Failed to fetch' ? 'API is not reachable. Start the backend on port 5000.' : err.message);
     } finally {
@@ -216,7 +213,7 @@ function AuthPage({ onAuth }) {
     try {
       const data = await request('/auth/forgot-password/reset', {
         email: form.email,
-        otp: form.otp,
+        token: form.resetToken,
         password: form.password
       });
       onAuth(data);
@@ -230,14 +227,14 @@ function AuthPage({ onAuth }) {
   const switchMode = (nextMode) => {
     setMode(nextMode);
     resetFeedback();
-    setForm((current) => ({ ...current, password: '', otp: '' }));
+    setForm((current) => ({ ...current, password: '', resetToken: nextMode === 'reset' ? current.resetToken : '' }));
   };
 
   const title = {
     login: 'Login',
     signup: 'Create account',
-    otp: 'Login with OTP',
-    forgot: 'Reset password'
+    forgot: 'Reset password',
+    reset: 'Choose new password'
   }[mode];
 
   return (
@@ -276,26 +273,22 @@ function AuthPage({ onAuth }) {
           <button type="submit" disabled={loading}>{mode === 'login' ? 'Login' : 'Sign up'}</button>
         </form>}
 
-        {mode === 'otp' && (
+        {mode === 'forgot' && (
           <div className="auth-stack">
             <label>Email</label>
             <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            <button type="button" className="secondary full-width" disabled={loading} onClick={requestOtp}>Send OTP</button>
-            <label>OTP</label>
-            <input inputMode="numeric" value={form.otp} onChange={(e) => setForm({ ...form, otp: e.target.value })} />
             {error && <p className="error">{error}</p>}
             {message && <p className="success">{message}</p>}
-            <button type="button" disabled={loading} onClick={verifyOtp}>Verify and login</button>
+            {resetLink && <a className="reset-link" href={resetLink}>Open reset link</a>}
+            <button type="button" disabled={loading} onClick={requestPasswordReset}>Send reset email</button>
           </div>
         )}
 
-        {mode === 'forgot' && (
+        {mode === 'reset' && (
           <form onSubmit={resetPassword}>
             <label>Email</label>
-            <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            <button type="button" className="secondary" disabled={loading} onClick={requestOtp}>Send reset OTP</button>
-            <label>OTP</label>
-            <input inputMode="numeric" value={form.otp} onChange={(e) => setForm({ ...form, otp: e.target.value })} />
+            <input type="email" value={form.email} readOnly />
+            <input type="hidden" value={form.resetToken} readOnly />
             <label>New password</label>
             <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
             {error && <p className="error">{error}</p>}
@@ -307,7 +300,6 @@ function AuthPage({ onAuth }) {
         <div className="auth-links">
           {mode !== 'login' && <button className="link-button" onClick={() => switchMode('login')}>Back to login</button>}
           {mode !== 'signup' && <button className="link-button" onClick={() => switchMode('signup')}>Create account</button>}
-          {mode !== 'otp' && <button className="link-button" onClick={() => switchMode('otp')}>Use OTP instead</button>}
           {mode !== 'forgot' && <button className="link-button" onClick={() => switchMode('forgot')}>Forgot password?</button>}
         </div>
       </section>
