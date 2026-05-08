@@ -319,6 +319,7 @@ function GoogleSignIn({ role, onAuth, onError }) {
   const buttonRef = useRef(null);
   const [serverClientId, setServerClientId] = useState('');
   const [configLoaded, setConfigLoaded] = useState(Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID));
+  const [googleMessage, setGoogleMessage] = useState('');
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || serverClientId;
 
   useEffect(() => {
@@ -346,13 +347,19 @@ function GoogleSignIn({ role, onAuth, onError }) {
         callback: async ({ credential }) => {
           try {
             onError('');
+            setGoogleMessage('');
             const res = await fetch(`${API_URL}/auth/google`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ credential, role })
             });
             const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.message || 'Google sign-in failed');
+            if (!res.ok) {
+              if (data.code === 'GOOGLE_EMAIL_EXISTS') {
+                setGoogleMessage(data.message);
+              }
+              throw new Error(data.message || 'Google sign-in failed');
+            }
             onAuth(data);
           } catch (err) {
             onError(err.message === 'Failed to fetch' ? 'API is not reachable. Start the backend on port 5000.' : err.message);
@@ -390,7 +397,28 @@ function GoogleSignIn({ role, onAuth, onError }) {
     return <p className="auth-note">Add GOOGLE_CLIENT_ID in the backend env to enable Google sign-in.</p>;
   }
 
-  return <div className="google-button" ref={buttonRef} />;
+  const chooseAnotherAccount = () => {
+    setGoogleMessage('');
+    onError('');
+    if (window.google?.accounts?.id) {
+      window.google.accounts.id.disableAutoSelect();
+    }
+    buttonRef.current?.querySelector('[role="button"]')?.click();
+  };
+
+  return (
+    <div className="google-auth-block">
+      <div className="google-button" ref={buttonRef} />
+      {googleMessage && (
+        <div className="google-conflict">
+          <p>{googleMessage}</p>
+          <button type="button" className="secondary full-width" onClick={chooseAnotherAccount}>
+            Choose another Gmail
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Dashboard({ api }) {

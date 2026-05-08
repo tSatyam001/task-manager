@@ -178,6 +178,27 @@ button[type='submit'],
   min-height: 42px;
 }
 
+.google-auth-block {
+  display: grid;
+  gap: 10px;
+}
+
+.google-conflict {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  background: #fff1f0;
+}
+
+.google-conflict p {
+  margin: 0;
+  color: #b42318;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .auth-note {
   margin: 0;
   padding: 10px 12px;

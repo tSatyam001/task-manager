@@ -256,6 +256,16 @@ router.post('/google', async (req, res) => {
       emailVerified: true,
       role: role || 'Member'
     });
+  } else if (user.googleId && user.googleId !== profile.sub) {
+    return res.status(409).json({
+      code: 'GOOGLE_EMAIL_EXISTS',
+      message: 'This Gmail address is already linked to another Google account. Choose another Gmail account.'
+    });
+  } else if (!user.googleId && user.authProvider !== 'google') {
+    return res.status(409).json({
+      code: 'GOOGLE_EMAIL_EXISTS',
+      message: 'This Gmail address is already registered. Login with your password or choose another Gmail account.'
+    });
   } else {
     user.googleId = user.googleId || profile.sub;
     user.emailVerified = true;
