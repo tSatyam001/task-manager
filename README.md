@@ -46,7 +46,7 @@ SMTP_PASS=your_smtp_password
 SMTP_FROM="Task Manager <no-reply@example.com>"
 ```
 
-If SMTP is not configured, OTPs are printed in the backend console for local development.
+SMTP is required for OTP login and forgot-password reset. OTPs are never returned to the browser.
 
 Optional frontend `.env`. If omitted, the frontend reads `GOOGLE_CLIENT_ID` from the backend auth config endpoint.
 

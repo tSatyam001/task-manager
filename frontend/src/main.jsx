@@ -186,7 +186,7 @@ function AuthPage({ onAuth }) {
     try {
       const path = mode === 'forgot' ? '/auth/forgot-password/request' : '/auth/otp/request';
       const data = await request(path, { email: form.email });
-      setMessage(data.devOtp ? `${data.message} OTP: ${data.devOtp}` : data.message);
+      setMessage(data.message);
     } catch (err) {
       setError(err.message === 'Failed to fetch' ? 'API is not reachable. Start the backend on port 5000.' : err.message);
     } finally {

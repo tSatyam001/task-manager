@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const protect = require('../middleware/auth');
-const { sendOtpEmail } = require('../utils/mailer');
+const { hasSmtpConfig, sendOtpEmail } = require('../utils/mailer');
 const { isEmail, missingFields } = require('../utils/validators');
 
 const router = express.Router();
@@ -46,12 +46,25 @@ const issueAuth = (user) => ({
   user: userResponse(user)
 });
 
-const otpResponse = (mailResult, otp) => ({
-  message: mailResult.delivered
-    ? 'OTP sent to your email'
-    : 'OTP generated. Configure SMTP to email it automatically; check the backend console for local development.',
-  ...(process.env.NODE_ENV !== 'production' && !mailResult.delivered ? { devOtp: otp } : {})
+const otpResponse = () => ({
+  message: 'OTP sent to your email'
 });
+
+const clearLoginOtp = (user) => {
+  user.loginOtpHash = undefined;
+  user.loginOtpExpires = undefined;
+};
+
+const clearResetOtp = (user) => {
+  user.resetOtpHash = undefined;
+  user.resetOtpExpires = undefined;
+};
+
+const emailNotConfiguredResponse = (res) => {
+  return res.status(503).json({
+    message: 'Email service is not configured. Add SMTP settings to send OTP emails.'
+  });
+};
 
 router.get('/config', (req, res) => {
   const configProblem = googleClientIdProblem();
@@ -136,19 +149,35 @@ router.post('/otp/request', async (req, res) => {
     return res.status(404).json({ message: 'No account found for this email' });
   }
 
+  if (!hasSmtpConfig()) {
+    return emailNotConfiguredResponse(res);
+  }
+
   const otp = createOtp();
   user.loginOtpHash = hashOtp(otp);
   user.loginOtpExpires = new Date(Date.now() + OTP_TTL_MS);
   await user.save();
 
-  const mailResult = await sendOtpEmail({
-    to: user.email,
-    otp,
-    subject: 'Your login OTP',
-    purpose: 'login'
-  });
+  try {
+    const mailResult = await sendOtpEmail({
+      to: user.email,
+      otp,
+      subject: 'Your login OTP',
+      purpose: 'login'
+    });
 
-  res.json(otpResponse(mailResult, otp));
+    if (!mailResult.delivered) {
+      clearLoginOtp(user);
+      await user.save();
+      return res.status(503).json({ message: mailResult.message || 'Unable to send OTP email' });
+    }
+  } catch (error) {
+    clearLoginOtp(user);
+    await user.save();
+    return res.status(502).json({ message: 'Unable to send OTP email. Check SMTP settings and try again.' });
+  }
+
+  res.json(otpResponse());
 });
 
 router.post('/otp/verify', async (req, res) => {
@@ -189,19 +218,35 @@ router.post('/forgot-password/request', async (req, res) => {
   const user = await User.findOne({ email });
 
   if (user) {
+    if (!hasSmtpConfig()) {
+      return emailNotConfiguredResponse(res);
+    }
+
     const otp = createOtp();
     user.resetOtpHash = hashOtp(otp);
     user.resetOtpExpires = new Date(Date.now() + OTP_TTL_MS);
     await user.save();
 
-    const mailResult = await sendOtpEmail({
-      to: user.email,
-      otp,
-      subject: 'Reset your password',
-      purpose: 'password reset'
-    });
+    try {
+      const mailResult = await sendOtpEmail({
+        to: user.email,
+        otp,
+        subject: 'Reset your password',
+        purpose: 'password reset'
+      });
 
-    return res.json(otpResponse(mailResult, otp));
+      if (!mailResult.delivered) {
+        clearResetOtp(user);
+        await user.save();
+        return res.status(503).json({ message: mailResult.message || 'Unable to send OTP email' });
+      }
+    } catch (error) {
+      clearResetOtp(user);
+      await user.save();
+      return res.status(502).json({ message: 'Unable to send OTP email. Check SMTP settings and try again.' });
+    }
+
+    return res.json(otpResponse());
   }
 
   res.status(404).json({ message: 'No account found for this email' });

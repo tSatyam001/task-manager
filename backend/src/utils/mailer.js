@@ -22,8 +22,10 @@ const sendOtpEmail = async ({ to, otp, subject, purpose }) => {
   const text = `Your ${purpose} OTP is ${otp}. It expires in 10 minutes.`;
 
   if (!transporter) {
-    console.log(`[OTP email disabled] ${to}: ${text}`);
-    return { delivered: false };
+    return {
+      delivered: false,
+      message: 'Email service is not configured. Add SMTP settings to send OTP emails.'
+    };
   }
 
   await transporter.sendMail({
@@ -36,4 +38,4 @@ const sendOtpEmail = async ({ to, otp, subject, purpose }) => {
   return { delivered: true };
 };
 
-module.exports = { sendOtpEmail };
+module.exports = { hasSmtpConfig, sendOtpEmail };
