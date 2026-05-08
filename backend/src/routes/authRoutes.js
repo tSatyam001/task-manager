@@ -204,7 +204,7 @@ router.post('/forgot-password/request', async (req, res) => {
     return res.json(otpResponse(mailResult, otp));
   }
 
-  res.json({ message: 'If an account exists for this email, a reset OTP will be sent.' });
+  res.status(404).json({ message: 'No account found for this email' });
 });
 
 router.post('/forgot-password/reset', async (req, res) => {
