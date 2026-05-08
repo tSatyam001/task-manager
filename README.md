@@ -48,7 +48,7 @@ SMTP_FROM="Task Manager <no-reply@example.com>"
 
 If SMTP is not configured, OTPs are printed in the backend console for local development.
 
-Optional frontend `.env`:
+Optional frontend `.env`. If omitted, the frontend reads `GOOGLE_CLIENT_ID` from the backend auth config endpoint.
 
 ```text
 VITE_API_URL=http://127.0.0.1:5000/api

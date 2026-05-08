@@ -317,7 +317,23 @@ function AuthPage({ onAuth }) {
 
 function GoogleSignIn({ role, onAuth, onError }) {
   const buttonRef = useRef(null);
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const [serverClientId, setServerClientId] = useState('');
+  const [configLoaded, setConfigLoaded] = useState(Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID));
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || serverClientId;
+
+  useEffect(() => {
+    if (import.meta.env.VITE_GOOGLE_CLIENT_ID) return;
+
+    fetch(`${API_URL}/auth/config`)
+      .then((res) => res.json())
+      .then((data) => {
+        setServerClientId(data.googleClientId || '');
+        setConfigLoaded(true);
+      })
+      .catch(() => {
+        setConfigLoaded(true);
+      });
+  }, []);
 
   useEffect(() => {
     if (!clientId) return;
@@ -366,8 +382,12 @@ function GoogleSignIn({ role, onAuth, onError }) {
     document.head.appendChild(script);
   }, [clientId, onAuth, onError, role]);
 
+  if (!configLoaded) {
+    return <p className="auth-note">Checking Google sign-in...</p>;
+  }
+
   if (!clientId) {
-    return <p className="auth-note">Add VITE_GOOGLE_CLIENT_ID to enable Google sign-in.</p>;
+    return <p className="auth-note">Add GOOGLE_CLIENT_ID in the backend env to enable Google sign-in.</p>;
   }
 
   return <div className="google-button" ref={buttonRef} />;

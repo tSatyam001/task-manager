@@ -42,6 +42,13 @@ const otpResponse = (mailResult, otp) => ({
   ...(process.env.NODE_ENV !== 'production' && !mailResult.delivered ? { devOtp: otp } : {})
 });
 
+router.get('/config', (req, res) => {
+  res.json({
+    googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+    googleOAuthEnabled: Boolean(process.env.GOOGLE_CLIENT_ID)
+  });
+});
+
 router.post('/signup', async (req, res) => {
   const { name, password, role } = req.body;
   const email = normalizeEmail(req.body.email);
