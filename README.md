@@ -4,7 +4,7 @@ A full-stack task management app for teams. Users can sign up, log in, create pr
 
 ## Features
 
-- Signup and login
+- Signup, password login, OTP login, Google sign-in, and forgot-password reset
 - Admin and Member roles
 - Project creation and team member selection
 - Task creation, assignment, priority, due date, and status updates
@@ -19,6 +19,7 @@ A full-stack task management app for teams. Users can sign up, log in, create pr
 - Express.js
 - MongoDB with Mongoose
 - JWT authentication
+- Email OTP delivery with SMTP
 
 ## Setup
 
@@ -36,6 +37,22 @@ PORT=5000
 MONGO_URI=your_mongodb_connection_string
 JWT_SECRET=your_secret_key
 CLIENT_URL=http://127.0.0.1:5173
+GOOGLE_CLIENT_ID=your_google_oauth_client_id
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_smtp_username
+SMTP_PASS=your_smtp_password
+SMTP_FROM="Task Manager <no-reply@example.com>"
+```
+
+If SMTP is not configured, OTPs are printed in the backend console for local development.
+
+Optional frontend `.env`:
+
+```text
+VITE_API_URL=http://127.0.0.1:5000/api
+VITE_GOOGLE_CLIENT_ID=your_google_oauth_client_id
 ```
 
 Install frontend packages:

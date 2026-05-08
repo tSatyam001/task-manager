@@ -18,9 +18,25 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: true,
       minlength: 6
     },
+    authProvider: {
+      type: String,
+      enum: ['local', 'google'],
+      default: 'local'
+    },
+    googleId: {
+      type: String,
+      sparse: true
+    },
+    emailVerified: {
+      type: Boolean,
+      default: false
+    },
+    loginOtpHash: String,
+    loginOtpExpires: Date,
+    resetOtpHash: String,
+    resetOtpExpires: Date,
     role: {
       type: String,
       enum: ['Admin', 'Member'],

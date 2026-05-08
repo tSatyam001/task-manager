@@ -95,6 +95,7 @@ select:focus {
 }
 
 button[type='submit'],
+.auth-stack > button:not(.secondary),
 .logout,
 .primary-action {
   background: #27628d;
@@ -133,6 +134,62 @@ button[type='submit'],
 .error {
   color: #b42318;
   margin: 6px 0;
+}
+
+.success {
+  color: #166534;
+  margin: 6px 0;
+}
+
+.auth-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 16px;
+}
+
+.auth-links .link-button {
+  margin-top: 0;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0;
+  color: #667085;
+  font-size: 13px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: #d5dde7;
+}
+
+.google-button {
+  min-height: 42px;
+}
+
+.auth-note {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px dashed #b7c7d7;
+  border-radius: 4px;
+  color: #4f5661;
+  background: #f7fafc;
+  font-size: 13px;
+}
+
+.full-width {
+  width: 100%;
 }
 
 .muted {

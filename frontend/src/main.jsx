@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 
@@ -140,35 +140,114 @@ function App() {
 
 function AuthPage({ onAuth }) {
   const [mode, setMode] = useState('login');
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'Member' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', otp: '', role: 'Member' });
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const request = async (path, body) => {
+    const res = await fetch(`${API_URL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || 'Unable to continue');
+    return data;
+  };
+
+  const resetFeedback = () => {
+    setError('');
+    setMessage('');
+  };
 
   const submit = async (event) => {
     event.preventDefault();
-    setError('');
+    resetFeedback();
+    setLoading(true);
 
     try {
       const path = mode === 'login' ? '/auth/login' : '/auth/signup';
       const body = mode === 'login' ? { email: form.email, password: form.password } : form;
-      const res = await fetch(`${API_URL}${path}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.message || 'Unable to continue');
+      const data = await request(path, body);
       onAuth(data);
     } catch (err) {
       setError(err.message === 'Failed to fetch' ? 'API is not reachable. Start the backend on port 5000.' : err.message);
+    } finally {
+      setLoading(false);
     }
   };
+
+  const requestOtp = async () => {
+    resetFeedback();
+    setLoading(true);
+
+    try {
+      const path = mode === 'forgot' ? '/auth/forgot-password/request' : '/auth/otp/request';
+      const data = await request(path, { email: form.email });
+      setMessage(data.devOtp ? `${data.message} OTP: ${data.devOtp}` : data.message);
+    } catch (err) {
+      setError(err.message === 'Failed to fetch' ? 'API is not reachable. Start the backend on port 5000.' : err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyOtp = async () => {
+    resetFeedback();
+    setLoading(true);
+
+    try {
+      const data = await request('/auth/otp/verify', { email: form.email, otp: form.otp });
+      onAuth(data);
+    } catch (err) {
+      setError(err.message === 'Failed to fetch' ? 'API is not reachable. Start the backend on port 5000.' : err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetPassword = async (event) => {
+    event.preventDefault();
+    resetFeedback();
+    setLoading(true);
+
+    try {
+      const data = await request('/auth/forgot-password/reset', {
+        email: form.email,
+        otp: form.otp,
+        password: form.password
+      });
+      onAuth(data);
+    } catch (err) {
+      setError(err.message === 'Failed to fetch' ? 'API is not reachable. Start the backend on port 5000.' : err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const switchMode = (nextMode) => {
+    setMode(nextMode);
+    resetFeedback();
+    setForm((current) => ({ ...current, password: '', otp: '' }));
+  };
+
+  const title = {
+    login: 'Login',
+    signup: 'Create account',
+    otp: 'Login with OTP',
+    forgot: 'Reset password'
+  }[mode];
 
   return (
     <main className="auth-page">
       <section className="auth-box">
-        <h1>{mode === 'login' ? 'Login' : 'Create account'}</h1>
-        <form onSubmit={submit}>
+        <h1>{title}</h1>
+        <GoogleSignIn role={form.role} onAuth={onAuth} onError={setError} />
+        <div className="auth-divider"><span>or</span></div>
+
+        {(mode === 'login' || mode === 'signup') && <form onSubmit={submit}>
           {mode === 'signup' && (
             <>
               <label>Name</label>
@@ -193,14 +272,105 @@ function AuthPage({ onAuth }) {
           )}
 
           {error && <p className="error">{error}</p>}
-          <button type="submit">{mode === 'login' ? 'Login' : 'Sign up'}</button>
-        </form>
-        <button className="link-button" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}>
-          {mode === 'login' ? 'Need an account?' : 'Already have an account?'}
-        </button>
+          {message && <p className="success">{message}</p>}
+          <button type="submit" disabled={loading}>{mode === 'login' ? 'Login' : 'Sign up'}</button>
+        </form>}
+
+        {mode === 'otp' && (
+          <div className="auth-stack">
+            <label>Email</label>
+            <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            <button type="button" className="secondary full-width" disabled={loading} onClick={requestOtp}>Send OTP</button>
+            <label>OTP</label>
+            <input inputMode="numeric" value={form.otp} onChange={(e) => setForm({ ...form, otp: e.target.value })} />
+            {error && <p className="error">{error}</p>}
+            {message && <p className="success">{message}</p>}
+            <button type="button" disabled={loading} onClick={verifyOtp}>Verify and login</button>
+          </div>
+        )}
+
+        {mode === 'forgot' && (
+          <form onSubmit={resetPassword}>
+            <label>Email</label>
+            <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            <button type="button" className="secondary" disabled={loading} onClick={requestOtp}>Send reset OTP</button>
+            <label>OTP</label>
+            <input inputMode="numeric" value={form.otp} onChange={(e) => setForm({ ...form, otp: e.target.value })} />
+            <label>New password</label>
+            <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            {error && <p className="error">{error}</p>}
+            {message && <p className="success">{message}</p>}
+            <button type="submit" disabled={loading}>Reset password</button>
+          </form>
+        )}
+
+        <div className="auth-links">
+          {mode !== 'login' && <button className="link-button" onClick={() => switchMode('login')}>Back to login</button>}
+          {mode !== 'signup' && <button className="link-button" onClick={() => switchMode('signup')}>Need an account?</button>}
+          {mode !== 'otp' && <button className="link-button" onClick={() => switchMode('otp')}>Use OTP instead</button>}
+          {mode !== 'forgot' && <button className="link-button" onClick={() => switchMode('forgot')}>Forgot password?</button>}
+        </div>
       </section>
     </main>
   );
+}
+
+function GoogleSignIn({ role, onAuth, onError }) {
+  const buttonRef = useRef(null);
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+  useEffect(() => {
+    if (!clientId) return;
+
+    const renderButton = () => {
+      if (!window.google || !buttonRef.current) return;
+
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: async ({ credential }) => {
+          try {
+            onError('');
+            const res = await fetch(`${API_URL}/auth/google`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ credential, role })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.message || 'Google sign-in failed');
+            onAuth(data);
+          } catch (err) {
+            onError(err.message === 'Failed to fetch' ? 'API is not reachable. Start the backend on port 5000.' : err.message);
+          }
+        }
+      });
+
+      buttonRef.current.innerHTML = '';
+      window.google.accounts.id.renderButton(buttonRef.current, {
+        theme: 'outline',
+        size: 'large',
+        width: buttonRef.current.offsetWidth || 360
+      });
+    };
+
+    if (window.google) {
+      renderButton();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = renderButton;
+    script.onerror = () => onError('Google sign-in script could not be loaded');
+    document.head.appendChild(script);
+  }, [clientId, onAuth, onError, role]);
+
+  if (!clientId) {
+    return <p className="auth-note">Add VITE_GOOGLE_CLIENT_ID to enable Google sign-in.</p>;
+  }
+
+  return <div className="google-button" ref={buttonRef} />;
 }
 
 function Dashboard({ api }) {
